@@ -18,7 +18,8 @@ IBM AltoroJ
 package com.ibm.security.appscan.altoromutual.servlet;
 
 import java.io.IOException;
-
+import java.security.InvalidParameterException;
+import java.util.regex.*;
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServlet;
@@ -33,55 +34,82 @@ import com.ibm.security.appscan.altoromutual.util.ServletUtil;
 /**
  * This servlet processes user's login and logout operations
  * Servlet implementation class LoginServlet
+ * 
  * @author Alexei
  */
 public class LoginServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
-	
-    /**
-     * @see HttpServlet#HttpServlet()
-     */
-    public LoginServlet() {
-        super();
-    }
 
 	/**
-	 * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
+	 * @see HttpServlet#HttpServlet()
 	 */
-	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-		//log out
+	public LoginServlet() {
+		super();
+	}
+
+	/**
+	 * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse
+	 *      response)
+	 */
+	protected void doGet(HttpServletRequest request, HttpServletResponse response)
+			throws ServletException, IOException {
+		// log out
 		try {
 			HttpSession session = request.getSession(false);
 			session.removeAttribute(ServletUtil.SESSION_ATTR_USER);
-		} catch (Exception e){
+		} catch (Exception e) {
 			// do nothing
 		} finally {
 			response.sendRedirect("index.jsp");
 		}
-		
+
+	}
+
+	private static final String USERNAME_REGEX = "^[a-zA-Z0-9_-]{3,16}$";
+	private static final String PASSWORD_REGEX = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=])(?=\\S+$).{8,}$";
+
+	public static boolean isValidUsername(String username) {
+		Pattern pattern = Pattern.compile(USERNAME_REGEX);
+		Matcher matcher = pattern.matcher(username);
+		return matcher.matches();
+	}
+
+	public static boolean isValidPassword(String password) {
+		Pattern pattern = Pattern.compile(PASSWORD_REGEX);
+		Matcher matcher = pattern.matcher(password);
+		return matcher.matches();
 	}
 
 	/**
-	 * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse response)
+	 * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse
+	 *      response)
 	 */
-	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-		//log in
+	protected void doPost(HttpServletRequest request, HttpServletResponse response)
+			throws ServletException, IOException {
+		// log in
 		// Create session if there isn't one:
 		HttpSession session = request.getSession(true);
 
 		String username = null;
-		
+
 		try {
 			username = request.getParameter("uid");
 			if (username != null)
 				username = username.trim().toLowerCase();
-			
+
 			String password = request.getParameter("passw");
-			password = password.trim().toLowerCase(); //in real life the password usually is case sensitive and this cast would not be done
-			
-			if (!DBUtil.isValidUser(username, password)){
-				Log4AltoroJ.getInstance().logError("Login failed >>> User: " +username + " >>> Password: " + password);
-				throw new Exception("Login Failed: We're sorry, but this username or password was not found in our system. Please try again.");
+			password = password.trim().toLowerCase(); // in real life the password usually is case sensitive and this
+														// cast would not be done
+
+			if (!isValidUsername(username) || !isValidPassword(password)) {
+				throw new InvalidParameterException(
+						"We're sorry, but this username or password didn't match criteria!!!!!!");
+			}
+
+			if (!DBUtil.isValidUser(username, password)) {
+				Log4AltoroJ.getInstance().logError("Login failed >>> User: " + username + " >>> Password: " + password);
+				throw new Exception(
+						"Login Failed: We're sorry, but this username or password was not found in our system. Please try again.");
 			}
 		} catch (Exception ex) {
 			request.getSession(true).setAttribute("loginError", ex.getLocalizedMessage());
@@ -89,18 +117,16 @@ public class LoginServlet extends HttpServlet {
 			return;
 		}
 
-		//Handle the cookie using ServletUtil.establishSession(String)
-		try{
-			Cookie accountCookie = ServletUtil.establishSession(username,session);
+		// Handle the cookie using ServletUtil.establishSession(String)
+		try {
+			Cookie accountCookie = ServletUtil.establishSession(username, session);
 			response.addCookie(accountCookie);
-			response.sendRedirect(request.getContextPath()+"/bank/main.jsp");
-			}
-		catch (Exception ex){
+			response.sendRedirect(request.getContextPath() + "/bank/main.jsp");
+		} catch (Exception ex) {
 			ex.printStackTrace();
 			response.sendError(500);
 		}
-			
-		
+
 		return;
 	}
 
